@@ -1,0 +1,92 @@
+
+source: fields is duckdb.table("data/fields.csv") extend {
+    rename: survey_dimension_key is column0
+}
+
+source: states is duckdb.table("data/2020_Census_Codes_States.csv") extend {
+    primary_key: STATE_NAME
+    --dimension: state_name is STATE_NAME
+}
+
+source: demographics is duckdb.table("data/survey.csv") extend {
+    primary_key: `Survey ResponseID`
+
+    dimension: demos_state_abbr is states.STATE
+    dimension: hh_size is replace(`Q-amazon-use-hh-size`, " (just me!)", "")
+    dimension: acct_users is replace(`Q-amazon-use-howmany`, " (just me!)", "")
+
+    dimension: order_freq is 
+        pick "< 5x/month" when `Q-amazon-use-how-oft` = "Less than 5 times per month"
+        pick "5-10x/month" when `Q-amazon-use-how-oft` = "5 - 10 times per month"
+        else "10x+/month"
+    dimension: age_group is replace(`Q-demos-age`, " years", "")
+    dimension: income_cleaned is replace(`Q-demos-income`, "Less than ", "$0 - ") 
+    dimension: education_ranked is
+        pick 0 when `Q-demos-education` = "Some high school or less"
+        pick 1 when `Q-demos-education` = "High school diploma or GED"
+        pick 2 when `Q-demos-education` = "Bachelor's degree"
+        pick 3 when `Q-demos-education` = "Graduate or professional degree (MA, MS, MBA, PhD, JD, MD, DDS, etc)"
+        else null
+    
+    join_one: states with `Q-demos-state`
+}
+
+source: transactions is duckdb.table("./data/amazon-purchases.csv") extend {
+    primary_key: `Survey ResponseID`
+
+    dimension: 
+        LineCost is `Purchase Price Per Unit` * `Quantity`
+        Item_Description is concat(`ASIN/ISBN (Product Code)`, " - ", `Title`)
+
+    view: top_5_categories is {
+        group_by: Category
+        aggregate: num_transactions
+        limit: 5
+        where: Category is not null
+    }
+
+    view: purchases_by_day is {
+        group_by: `Order Date`
+        aggregate: daily_purchases is sum(LineCost)
+        order_by: `Order Date`
+    }
+
+    view: purchases_by_product is {
+        group_by: `ASIN/ISBN (Product Code)`
+        aggregate: amount_sold is sum(Quantity)
+        where: `ASIN/ISBN (Product Code)` != null AND Title != null
+    }
+
+    view: purchases_by_product_name is {
+        group_by: Title
+        aggregate: amount_sold is sum(Quantity)
+    }
+        
+    measure:
+        num_transactions is count()
+        items_purchased is sum(`Quantity`)
+        total_cost is sum(LineCost)
+        product_count is count(`ASIN/ISBN (Product Code)`)
+
+    join_one: demographics with `Survey ResponseID`
+}
+
+run: transactions -> {
+    select: `Purchase Price Per Unit`, `Quantity`, LineCost
+    limit: 5
+    where: Quantity > 1
+}
+
+run: transactions -> {
+    aggregate: num_null is count(Item_Description)
+    --where: `ASIN/ISBN (Product Code)` != null AND Title != null
+}
+
+run: transactions -> {
+    aggregate: distinct_items is count(Item_Description)
+}
+
+run: demographics -> {
+    group_by: `Q-demos-education`
+    aggregate: num_users is count(acct_users)
+}

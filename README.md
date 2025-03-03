@@ -2,6 +2,8 @@
 
 # Amazon Transactions Dataset Analysis-Preliminary Draft
 
+[![License](https://img.shields.io/badge/License-CC0-lightgray.svg?style=flat-square)](https://creativecommons.org/publicdomain/zero/1.0/) ![GitHub last commit](https://img.shields.io/github/last-commit/ambermocalis/Amazon_Transactions)
+
 ## Summary of Findings
 This analysis explores purchasing behavior on Amazon, focusing on the correlation between demographics (age, income, education level) and product categories purchased. The findings suggest that demographic factors significantly influence purchase decisions, with certain age groups and income levels showing preferences for specific product types. Additionally, regional variations in product choices and spending behavior were identified. 
 
@@ -19,6 +21,11 @@ The data was voluntarily shared by individuals who reported their Amazon purchas
 ---
 ## Code
 The analysis uses Python, with libraries such as `pandas`, `matplotlib`, and `seaborn` to process and visualize the data. You can find the full code in the `analysis.py` script.
+
+---
+## Large Dataset Storage
+Due to GitHub's file size limits, the dataset is hosted externally.  
+Download the dataset from [Harvard Dataverse](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/YGLYDY) before running the analysis.
 
 ---
 
@@ -62,4 +69,7 @@ After cloning, you can open the repository in your favorite code editor:
 ---
 
 # Licensing
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The code and analysis in this respository are distributed under the terms of the [Creative Commons 1.0 Universal license (CC0)](LICENSE).
+
+# References
+1. Alex Berke; Dan Calacci; Robert Mahari; Takahiro Yabe; Kent Larson; Sandy Pentland, 2023, "Open e-commerce 1.0: Five years of crowdsourced U.S. Amazon purchase histories with user demographics", Harvard Dataverse, V1, [Link](https://doi.org/10.7910/DVN/YGLYDY).
