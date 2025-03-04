@@ -11,22 +11,30 @@ source: states is duckdb.table("data/2020_Census_Codes_States.csv") extend {
 source: demographics is duckdb.table("data/survey.csv") extend {
     primary_key: `Survey ResponseID`
 
-    dimension: demos_state_abbr is states.STATE
-    dimension: hh_size is replace(`Q-amazon-use-hh-size`, " (just me!)", "")
-    dimension: acct_users is replace(`Q-amazon-use-howmany`, " (just me!)", "")
-
-    dimension: order_freq is 
-        pick "< 5x/month" when `Q-amazon-use-how-oft` = "Less than 5 times per month"
-        pick "5-10x/month" when `Q-amazon-use-how-oft` = "5 - 10 times per month"
-        else "10x+/month"
-    dimension: age_group is replace(`Q-demos-age`, " years", "")
-    dimension: income_cleaned is replace(`Q-demos-income`, "Less than ", "$0 - ") 
-    dimension: education_ranked is
-        pick 0 when `Q-demos-education` = "Some high school or less"
-        pick 1 when `Q-demos-education` = "High school diploma or GED"
-        pick 2 when `Q-demos-education` = "Bachelor's degree"
-        pick 3 when `Q-demos-education` = "Graduate or professional degree (MA, MS, MBA, PhD, JD, MD, DDS, etc)"
-        else null
+    dimension: 
+        demos_state_abbr is states.STATE
+        hh_size is replace(`Q-amazon-use-hh-size`, " (just me!)", "")
+        acct_users is replace(`Q-amazon-use-howmany`, " (just me!)", "")
+        order_freq is 
+            pick "< 5x/month" when `Q-amazon-use-how-oft` = "Less than 5 times per month"
+            pick "5-10x/month" when `Q-amazon-use-how-oft` = "5 - 10 times per month"
+            else "10x+/month"
+        age_group is replace(`Q-demos-age`, " years", "")
+        income_cleaned is replace(`Q-demos-income`, "Less than $25,000", "$0 - $24,999") 
+        income_more_than is 
+            pick 0 when income_cleaned = "$0 - $24,999"
+            pick 25 when income_cleaned = "$25,000 - $49,999"
+            pick 50 when income_cleaned = "$50,000 - $74,999"
+            pick 75 when income_cleaned = "$75,000 - $99,999"
+            pick 100 when income_cleaned = "$100,000 - $149,999"
+            pick 150 when income_cleaned = "$150,000 or more"
+            else null
+        education_ranked is
+            pick 0 when `Q-demos-education` = "Some high school or less"
+            pick 1 when `Q-demos-education` = "High school diploma or GED"
+            pick 2 when `Q-demos-education` = "Bachelor's degree"
+            pick 3 when `Q-demos-education` = "Graduate or professional degree (MA, MS, MBA, PhD, JD, MD, DDS, etc)"
+            else null
     
     join_one: states with `Q-demos-state`
 }
@@ -37,36 +45,130 @@ source: transactions is duckdb.table("./data/amazon-purchases.csv") extend {
     dimension: 
         LineCost is `Purchase Price Per Unit` * `Quantity`
         Item_Description is concat(`ASIN/ISBN (Product Code)`, " - ", `Title`)
+        `Order Year` is `Order Date`.years
+        `Order Day` is day_of_week(`Order Date`) // where day 0 = Saturday & day 6 = Friday
+        
 
-    view: top_5_categories is {
+    view: `Top 5 Categories` is {
         group_by: Category
-        aggregate: num_transactions
+        aggregate: items_purchased
         limit: 5
         where: Category is not null
     }
-
-    view: purchases_by_day is {
-        group_by: `Order Date`
-        aggregate: daily_purchases is sum(LineCost)
-        order_by: `Order Date`
+    view: `Top Categories` is {
+        group_by: Category
+        aggregate: items_purchased
+        limit: 10
+        where: Category is not null
     }
-
-    view: purchases_by_product is {
-        group_by: `ASIN/ISBN (Product Code)`
-        aggregate: amount_sold is sum(Quantity)
-        where: `ASIN/ISBN (Product Code)` != null AND Title != null
+    view: `% Purchases by Age` is {
+        group_by: demographics.age_group
+        # percent
+        aggregate: `% Purchases` is items_purchased / all(items_purchased)
+        order_by: age_group
     }
-
+    view: `Day of Month` is {
+        group_by: `Day of Month` is `Order Date`.day
+        aggregate: items_purchased
+        order_by: `Day of Month`
+    }
+    view: `Categories by Year` is {
+        group_by: `Order Year`
+        aggregate: num_rows
+        order_by: `Order Year`
+        where: `Order Year` < @2023
+    }
+    view: `Purchases by Day` is {
+        group_by: `Order Day`
+        aggregate: items_purchased
+        order_by: `Order Day`
+    }
+    view: `Purchases by Year` is {
+        group_by: `Order Year`
+        aggregate: items_purchased
+        order_by: `Order Year`
+    }
+    view: `Purchases by Age` is {
+        group_by: demographics.age_group
+        aggregate: items_purchased
+        order_by: age_group
+    }
+    view: `Purchases by Age w Variation` is {
+        group_by: demographics.age_group
+        # percent
+        aggregate: 
+            `% Purchases` is items_purchased / all(items_purchased)
+            `% Respondents` is count(`Survey ResponseID`) / all(count(`Survey ResponseID`))
+            `% Variation` is ((items_purchased / all(items_purchased)) - (count(`Survey ResponseID`) / all(count(`Survey ResponseID`)))) // negative means less than 1:1 purchase ratio, positive means more than 1:1 ratio of purchasers to purchases.
+        order_by: `% Variation` desc
+    }
+    view: `% Purchases by Gender` is {
+        where: demographics.`Q-demos-gender` != "Prefer not to say"
+        group_by: `Order Year`, Gender is demographics.`Q-demos-gender`
+        # percent
+        aggregate: `% Purchases` is items_purchased / all(items_purchased)
+        order_by: `% Purchases` desc
+    }
+    view: `Purchase Amount by Gender` is {
+        --where: demographics.`Q-demos-gender` != "Prefer not to say"
+        group_by: `Order Year`, Gender is demographics.`Q-demos-gender`
+        aggregate: # currency
+            total_cost
+            --# percent
+            --`% of Purchase Amount` is total_cost / all(total_cost)
+    }
+     view: `% Purchase Amount by Gender` is {
+        --where: demographics.`Q-demos-gender` != "Prefer not to say"
+        group_by: `Order Year`, Gender is demographics.`Q-demos-gender`
+        aggregate: # percent
+            `% of Purchase Amount` is total_cost / all(total_cost)
+        order_by: `% of Purchase Amount` desc
+    }
+   view: `Purchases by Income` is {
+        where: demographics.income_cleaned != "Prefer not to say"
+        group_by: demographics.income_cleaned
+        aggregate: items_purchased
+    }
+    view: `Purchases by Education` is {
+        where: demographics.education_ranked != null
+        group_by: demographics.`Q-demos-education`
+        aggregate: items_purchased
+    }
+    view: `% Purchase Amount by Income` is {
+        where: demographics.income_cleaned != "Prefer not to say"
+        group_by: demographics.income_cleaned
+        # percent
+        aggregate: Purchases is total_cost / all(total_cost)
+    }
+    view: `% Purchase Amount by Education` is {
+        where: demographics.education_ranked != null
+        group_by: demographics.`Q-demos-education`
+        # percent
+        aggregate: Purchases is total_cost / all(total_cost)
+    }
+    view: `Total Purchases by State` is {
+        group_by: demographics.states.STATE
+        aggregate: # currency
+            `Total Purchases` is total_cost
+    }
     view: purchases_by_product_name is {
         group_by: Title
         aggregate: amount_sold is sum(Quantity)
     }
-        
+   
     measure:
-        num_transactions is count()
-        items_purchased is sum(`Quantity`)
+        num_categories is count(Category)
+        num_respondents is count(`Survey ResponseID`)
+        num_rows is count()
+        --num_orders is count() {where: `Survey ResponseID` AND `Order Date` are same}
+        items_purchased is sum(Quantity)
         total_cost is sum(LineCost)
-        product_count is count(`ASIN/ISBN (Product Code)`)
+        product_count_distinct is count(`ASIN/ISBN (Product Code)`)
+        `% Purchases` is items_purchased / all(items_purchased)
+        `% Sales` is sum(LineCost) / all(sum(LineCost))
+
+        --calculate: 
+            
 
     join_one: demographics with `Survey ResponseID`
 }

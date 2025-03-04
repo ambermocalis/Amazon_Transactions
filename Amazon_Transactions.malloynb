@@ -13,323 +13,334 @@ run: transactions -> {
     select: *
     limit: 5
 }
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
 >>>malloy
 run: demographics -> {
     select: *
     limit: 5
 }
 >>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
+### Basic Analysis Questions:
+#### Question 1
+**What are the most common product categories purchased on Amazon?**
 >>>malloy
-# bar_chart {size=lg}
+# bar_chart {size=lg, title="Transaction by Product Categories"}
 run: transactions -> {
     group_by: Category
-    aggregate: num_transactions
+    aggregate: num_rows
     where: Category is not null
     limit: 50
     # tooltip
     # bar_chart
-    nest: by_year is {
-        group_by: `Order Date`.years
-        aggregate: num_transactions
-        --order_by: `Order Date`.years desc
-        where: `Order Date`.years < @2023
-    }
+    nest: `Categories by Year`
 }
 >>>malloy
-# bar_chart {size=lg}
+# bar_chart {size=lg, title="Top 10 Sale Categories", subtitle="Plus Category Breakdown by Year"}
 run: transactions -> {
-    group_by: `Order Date`.years
-    aggregate: num_transactions
+    group_by: Category
+    aggregate: num_rows
+    where: Category is not null
+    limit: 10
     # tooltip
-    nest: `Transactions by Category` is {
-        group_by: Category
-        aggregate: num_transactions
-        where: Category != null
-        limit: 50}
-    where: `Order Date`.years < @2023
+    # bar_chart
+    nest: `Categories by Year`
+}
+>>>markdown
+1. Answer: Interestingly enough, the top purchase category of Amazon customers are <ins>**books**</ins> at over 87,000 transactions from 2018 to 2022! Books experience over 128% higher sales than the next highest category of <ins>**pet food**</ins>. Keep in mind that this is over the entire time range captured by the survey.
+>>>malloy
+run: transactions -> {
+    group_by: `ASIN/ISBN (Product Code)`, Title
+    aggregate: num_rows
+    order_by: num_rows desc
+    limit: 10
+}
+>>>markdown
+For curiosity's sake, the most purchased item by the survey respondents (that was not a gift card) was Amazon Basic AA batteries. After batteries, the Echo Dot Alexa speaker was the most purchased item.
+>>>malloy
+# bar_chart {title="Items Sold by Year (and Category)"}
+run: transactions -> {
+    group_by: `Order Year`
+    aggregate: items_purchased
+    # tooltip
+    nest: `Top Categories`
+    order_by: `Order Year`
+    where: `Order Year` < @2023
 }
 >>>malloy
-# bar_chart {size=lg}
+# bar_chart {size=lg, title="Top 5 Category Purchases by Year"}
 run: transactions -> {
-    group_by: `Order Date`.years
-    aggregate: num_transactions
+    group_by: `Order Year`
+    aggregate: items_purchased
     # tooltip
     # bar_chart {x.independent}
-    nest: top_5_categories
-where: `Order Date`.years < @2023}
+    nest: `Top 5 Categories`
+    order_by: `Order Year`
+    where: `Order Year` < @2023}
 >>>markdown
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
+1. You can see in the above charts that <ins>**books**</ins> and <ins>**pet food**</ins> remain top purchases of Amazon customers each year, with <ins>**gift card purchases**</ins>, <ins>**shirts**</ins>, and <ins>**nutritional supplements**</ins> vying for 3rd, 4th, and 5th place for sales.
+>>>markdown
+#### Question 2
+**How do demographics (age, income, education) influence purchasing behavior?**
+
+##### Age Group Analysis
 >>>malloy
-# bar_chart {size=lg}
 run: transactions -> {
-    group_by: `Order Date`.years
-    aggregate: num_transactions
+    group_by: demographics.age_group
+    aggregate: num_respondents
+    # percent
+    aggregate: percent_total is num_respondents / all(num_respondents)
+    order_by: age_group
+}
+>>>markdown
+First-to better understand the composition of our survey respondents, I've run an analysis on the percent of respondents by age group. You'll see here that the 25-34 and 25-44 year groups comprise over 60% of our survey respondents.
+
+Now we can analyze the percent of total purchases by each age group to see if our purchase trends correlate with the size of our survey respondents, in addition to a basic analysis of purchasing rates.
+>>>malloy
+# bar_chart {size=lg, title="Percent of Purchases by Year and Age Group"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    aggregate: items_purchased
+    order_by: `Order Year`
+    # tooltip 
+    nest: `% Purchases by Age`
+}
+>>>malloy
+# bar_chart {size=lg, title="Yearly Comparison of Purchases by Age Group"}
+run: transactions -> {
+    group_by: `Order Year`, demographics.age_group
+    aggregate: items_purchased
+    where: `Order Year` < @2023
+    order_by: age_group, `Order Year` asc
+}
+>>>malloy
+# bar_chart.stack
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`, demographics.age_group
+    aggregate: items_purchased
+    order_by: `Order Year`, age_group
+
+}
+>>>malloy
+# bar_chart {size=lg, title="Items Purchase Compared with Number of Participants by Age Group"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    aggregate: items_purchased
+    order_by: `Order Year`
     # tooltip {size=spark}
-    # bar_chart {x.independent}
-    nest: by_age is {
-        group_by: demographics.age_group
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }
-    # tooltip
-    # bar_chart {x.independent}
-    nest: by_gender is {
-        group_by: demographics.`Q-demos-gender`
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }
-    # tooltip
-    # bar_chart {x.independent}
-    nest: by_income is {
-        group_by: demographics.income_cleaned
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }    
-    # tooltip
-    # bar_chart {x.independent}
-    nest: by_education_level is {
-        group_by: demographics.education_ranked
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }
-where: `Order Date`.years < @2023}
->>>markdown
-<mark> START HERE ON MONDAY </mark>
->>>malloy
-run: transactions -> {
-    group_by: `Order Date`.years
-    aggregate: num_transactions
-    nest: by_age is {
-        group_by: demographics.age_group
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }
-    nest: by_gender is {
-        group_by: demographics.`Q-demos-gender`
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }
-    nest: by_income is {
-        group_by: demographics.income_cleaned
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }    
-    nest: by_education_level is {
-        group_by: demographics.education_ranked
-        --aggregate: num_transactions
-        # percent
-        aggregate: `% Purchases` is num_transactions / all(num_transactions)
-    }
-where: `Order Date`.years < @2023
---order_by: 
+    nest: `Purchases by Age w Variation`
 }
 >>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
->>>markdown
-Questions and Suggested Visualizations:
-1. **What are the most common product categories purchased on Amazon?**
-    - Visualization: Bar chart showing the frequency of each product category.
-2. **How do demographics (age, income, education) influence purchasing behavior?**
-    - Visualization: Scatter plot or heatmap showing correlations between demographics and types of products purchased.
-3. **Do certain age groups spend more on particular product categories?**
-    - Visualization: Stacked bar chart or boxplot comparing spending across age groups for different categories.
-4. **What is the relationship between income level and the number of items purchased?**
-    - Visualization: Scatter plot with income on the x-axis and number of items purchased on the y-axis.
-5. **Are there regional differences in product preferences or spending habits?**
-    - Visualization: Heatmap of spending or preferences by region, or bar charts comparing regions.
-6. **What are the most purchased products, and do certain demographics influence these trends?**
-    - Visualization: A combination of bar charts (for top products) and segmented bar charts (by demographic).
-7. **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
-    - Visualization: Line graph showing purchases over time, with markers for holidays or seasons.
-8. **Are there differences in spending based on education level?**
-    - Visualization: Boxplot comparing average spending across education levels.
-9. **What is the relationship between the frequency of purchases and customer satisfaction ratings?**
-    - Visualization: Scatter plot of purchase frequency versus average satisfaction ratings.
-10. **How do respondents' opinions on product quality correlate with their purchase habits?**
-    - Visualization: Heatmap or scatter plot comparing product quality ratings and purchase volume.
+Therefore, what we see in the charts above is that 25-34 and 35-44 year age groups comprise the bulk of purchases, but when you compare the size of the age group as a percent of all age groups, we find that the 35-44 and 45-54 year age groups are making larger purchases in terms of variety of purchases across categories.
+
+To continue analyzing this data, let's look at gender, income, and education level to better understand purchase trends.
+
+##### Gender Purchasing Trends
 >>>malloy
+run: transactions -> {
+    where: demographics.`Q-demos-gender` != "Prefer not to say"
+    group_by: Gender is demographics.`Q-demos-gender`
+    aggregate: num_respondents
+    # percent
+    aggregate: percent_total is num_respondents / all(num_respondents)
+}
+>>>malloy
+# bar_chart {size=lg, title="Items Purchased by Year and Gender"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    aggregate: items_purchased
+    order_by: `Order Year`
+    # tooltip 
+    nest: `% Purchases by Gender`
+}
+>>>malloy
+# bar_chart.stack {size=lg, title="Items Purchased by Gender"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`, Gender is demographics.`Q-demos-gender`
+    aggregate: items_purchased
+        # percent
+        `% Purchases` is items_purchased / all(items_purchased)    
+    order_by: `Order Year`    
+}
+>>>malloy
+# bar_chart {size=lg, title="Total Purchase Amount by Year and Gender"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    # currency
+    aggregate: total_cost
+    order_by: `Order Year`
+    # tooltip 
+    # bar_chart.stack
+    nest: `Purchase Amount by Gender`
+}
+>>>malloy
+# bar_chart {size=lg, title="Total Purchases by Year and Gender"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    aggregate: total_cost
+    order_by: `Order Year`
+    # tooltip 
+    # bar_chart
+    nest: `% Purchase Amount by Gender`
+}
+>>>markdown
+We see here from this series of graphs that purchasing trends are consistent with anecdotal consumer trends, which is that women are purchasing a greater number of items and for a higher total purchase amount-which just means that there's no difference between the cost of individual items purchased between genders (i.e. men aren't buying fewer but more expensive items, the variation of item cost is roughly the same).
+
+##### Education Level Analysis
+>>>malloy
+run: transactions -> {
+    where: demographics.education_ranked != null
+    group_by: demographics.education_ranked, Education is demographics.`Q-demos-education`
+    aggregate: num_respondents
+    # percent
+    aggregate: percent_total is num_respondents / all(num_respondents)
+    order_by: education_ranked
+}
+>>>malloy
+# bar_chart {title="Items Purchased by Year and Education Level"}
+run: transactions -> {
+    where: demographics.education_ranked != null
+    group_by: Education is demographics.`Q-demos-education`
+    aggregate: items_purchased
+    # tooltip
+    # bar_chart
+    nest: `Purchases by Year`
+}
+>>>malloy
+# bar_chart {title="Items Purchases by Education Level"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    where: demographics.education_ranked != null
+    group_by: `Order Year`, Education is demographics.`Q-demos-education`
+    aggregate: items_purchased
+    order_by: `Order Year`, items_purchased desc
+}
+>>>markdown
+This series of analyses on education level reveals something interesting: this survey and the bulk of transactions are made by consumers with a **High School** or **Bachelor's degree** level education (approx 12-17 years of formal education in total). Those with only some high school make up less than 1% of the survey respondents...probably due to the age requirement to be able to participate in the survey, among other reasons. But consumers with graduate or professional level educations either do not participate in surveys or do not utilize Amazon for consumer-purchasing at the same level.
+ 
+##### Income Bracket Analysis
+>>>malloy
+run: transactions -> {
+    where: demographics.income_cleaned != "Prefer not to say"
+    group_by: demographics.income_more_than, demographics.income_cleaned
+    aggregate: num_respondents
+    # percent
+    aggregate: percent_total is num_respondents / all(num_respondents)
+    order_by: income_more_than
+}
+>>>malloy
+# bar_chart {size=lg, title="Items Purchased by Year and Income Level"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    aggregate: items_purchased
+    order_by: `Order Year`
+    # tooltip 
+    # bar_chart
+    nest: `Purchases by Income`
+}
+>>>malloy
+# bar_chart {title="Items Purchased by Income Level"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    where: demographics.income_more_than != null
+    group_by: `Order Year`, Income is demographics.income_cleaned
+    aggregate: items_purchased
+    order_by: `Order Year`, items_purchased desc
+}
+>>>markdown
+To continue with the trend above, and generously assuming some level of correllation between education level and income level, we find that the preponderance of purchases is made by those in the $100k-$150k income bracket, with the $25k to $75k income levels following closely behind. It is interesting to see that the $75k-$100k bracket lags behind the three previously mentioned brackets, following by the over $150k and the $0 - $25k brackets, respectively. 
+
+Variance in the data could be caused by the higher rates of survey respondents in the $25k-$50k and $50k-$75k brackets, with 6-7% more respondents than the $75k bracket. But this analysis leads me to believe that shopping on Amazon is predominantly utilized by the middle-class consumer. This would make sense, since the ease of shopping offer by Amazon allows for busy, dual-working families to still maintain a modicum of consumer spending without the required trip to a retail store.
+
+For interest, I've put together a scatter chart of income-education counts. It's not a great heat map, but you can see verify that there is some correllation between education level and income.
+>>>malloy
+# scatter_chart {trendline}
+run: transactions -> {
+    group_by: income is demographics.income_more_than
+    group_by: education is demographics.education_ranked
+    aggregate: `%` is num_respondents / all(num_respondents)
+}
+>>>markdown
+#### Question 3. 
+**Do certain age groups spend more on particular product categories?**
+>>>malloy
+
+run: transactions -> {
+    group_by: demographics.age_group
+    where: `Order Year` < @2023
+    order_by: age_group
+    #  bar_chart {x.independent, y.independent}
+    nest: `Top 5 Categories`
+}
+>>>malloy
+# bar_chart.stack
+run: transactions -> {
+    where: Category ? 'ABIS_BOOK' | 'PET_FOOD' | 'NUTRITIONAL_SUPPLEMENT' | 'SHIRT' | 'GIFT_CARD' | 'MEDICATION' | 'COFFEE' --`Order Year` < @2023
+    group_by: demographics.age_group, Category
+    aggregate: items_purchased
+    order_by: age_group, Category
+    --#  bar_chart {x.independent, y.independent}
+    --nest: `Top 5 Categories`
+}
+>>>markdown
+Short answer-we've already seen that books, pet food, gift cards, shirts, and nutritional supplements are the top categories across all age groups. The only significant change we see is coffee and medication being added to top categories purchased by the 55-64 and 65 and over categories.
+
+#### Question 5. 
+**Are there regional differences in product preferences or spending habits?**
+>>>malloy
+run: transactions -> {
+    where: demographics.states.REGION_NAME != null
+    group_by: demographics.states.REGION_NAME
+    # currency
+    aggregate: `Total Purchases` is total_cost
+    nest:
+        # shape_map
+        `Total Purchases by State`
+        # bar_chart (size=sm, x.independent, y.independent)
+        `Top Categories`
+}
+>>>markdown
+This really neat heat map breaks out purchasing behavior by region and state. Most notable is what categories are NOT being purchased in certain regions. Consumers in the Northeast are not getting electronic accessories on Amazon, instead they are purchasing food, vegetables, and grocery items. Consumers in the South are also not getting their groceries through Amazon.
+
+#### Question 4. 
+**How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
+
+Now let's take a look at orders over time to see how they trend and if there are certain times of the year that are busier than others as far as overall ordering goes, or if certain category sales spike?
+
+>>>malloy
+--# line_chart
+run: transactions -> {
+    where: `Order Date`.year < @2023
+    group_by: `Order Year`
+    aggregate: total_cost
+    # line_chart {y.independent}
+    nest: `By Month` is {
+        group_by: `Order Month` is `Order Date`.month
+        aggregate: total_cost
+        order_by: `Order Month` 
+        # tooltip
+        nest: 
+            # line_chart {x.independent}
+            `Day of Month`
+            # bar_chart {x.independent}
+            `Top 5 Categories`
+    }
+    order_by: `Order Year` 
+}
+>>>markdown
+This visualization shows some interesting spikes in sales over the course of the year. If you hover over the graph, you'll see a "tooltip" that shows you a daily breakdown of reported purchases and top sales categories. You'll notice as you scroll through the months in each year there are the expected spikes around Black Friday and Cyber Monday at the end of November, beginning of December. If you look carefully, however, you'll notice there is another spike, usually in July, but in October 2020 and June in 2021. Some years daily sales nearly double! These spikes correspond with Amazon's Prime Day dates. 
+
+Here are some Amazon Prime Day dates from the last seven years: 
+- 2024: July 16–17
+- 2023: July 11–12
+- 2022: July 12–13
+- 2021: June 21–22
+- 2020: Oct 13–14 *moved due to the COVID-19 pandemic
+- 2019: July 15–16
+- 2018: July 16–17
