@@ -13,25 +13,28 @@ When it comes to purchasing products on Amazon, consumers think fast, inexpensiv
 
 When it comes to what kinds of products customers are purchasing from Amazon, books sales take the top spot, selling over 125% more than the next leading sales category--pet food. Amazon enthusiasts may recall that Amazon actually started out as a book seller...so this analysis makes sense!
 <p align="center">
-    <img alt="Top 10 Sales Categories." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/top_sales_categories.png">
     <img alt="Spark Chart of Sales Categories" width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/top_categories_spark.png">
+    <img alt="Top 10 Sales Categories." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/top_sales_categories.png">
 </p>
 <p align="center">
     <em>Figure: Two visuals of Amazon's Top 10 Sales Categories.</em>
 </p>
 
-The findings suggest that age and income demographic factors significantly influence purchase rates in terms of items purchased and total sales. 25-34 and 35-44 year olds account for more than 50% of item purchases each year and women outpace men in terms of volume and total cost of items purchased <mark>(see the malloynb file at the end of the "Age Group Purchasing Trends" section for a bonus insight on how 25-34, 35-44, and 45-54 year groups compare).</mark> 
+The findings suggest that age and income demographic factors significantly influence purchase rates in terms of items purchased and total sales. 25-34 and 35-44 year olds account for more than 50% of item purchases each year and women outpace men in terms of volume and total cost of items purchased. 
+
 <p align="center">
     <img alt="Purchases by Age Group." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchases_by_age_group.png">
     <img alt="Purchase Categories by Age Group" width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchases_by_age_group_categories.png">
 </p>
 <p align="center">
     <img alt="Purchases by Gender" width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchases_by_gender.png">
-    <img alt="Purchases by Education Level." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchases_by_education.png">
+    <img alt="Purchases by Education Level." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchasing_by_education.png">
 </p>
 <p align="center">
     <em>Figure: Screenshots of visualizations of Age, Gender, and Education Level.</em>
 </p>
+
+###### Bonus: see the malloynb file at the end of the "Age Group Purchasing Trends" section for a bonus insight on how 25-34, 35-44, and 45-54 year groups compare
 
 I found two things that seemed exceptional in the course of my analysis. The first, which was interesting, but not particularly surprising, was that median-income households made up the majority of consumer purchases on Amazon. I don't find it surprising that lower-income households (less than $25,000 annual income) purchase less on Amazon, since their purchasing power is more limited due to their reduced capacity for discretionary spending. Additionally, while correlation does not equal causation, higher income households (greater than $150,000 annual income) were shown to spend less on Amazon, possibly because they have enough discretionary income to source more expensive products in-store or through other retail services. This is speculation, and we would need additional data to confirm my hypothesis.
 <p align="center">
@@ -41,7 +44,7 @@ I found two things that seemed exceptional in the course of my analysis. The fir
 The second insight the data provided was absolutely fascinating to me: while the majority of respondents in this dataset were buying books, pet food, clothing and electronic accessories, the Native Hawaiian or Other Pacific Islander demographic was predominantly buying their foodstuffs through Amazon! Food, Water, Poultry, Fruit Snacks, and Snack Crisps/Chips were their top 5 categories. With the exception of Food, those categories don't even show up in the top 10 categories across the dataset population!
 <p align="center">
     <img alt="Purchasing by Race-Spark Charts." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchases_by_race_spark.png">
-    <img alt="Purchases by Race-Category Snapshot" width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchases_variation_example.png">
+    <img alt="Purchases by Race-Category Snapshot" width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/purchasing_variation_example.png">
 </p>
 <p align="center">
 <img alt="Patterns in Geography and Purchasing by Race." width="90%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/shape_map_race_patterns.png"><br>
@@ -50,11 +53,15 @@ The second insight the data provided was absolutely fascinating to me: while the
     <em>Figure: Surprising Insights Into Preferred Categories by Race.</em>
 </p>
 
-Finally, there is also a direct correllation between purchasing rate spikes and distinct Amazon sale periods, like Prime Deal Days and Black Friday or Cyber Monday sales. I spent minimal time exploring this trend. This could be an opportunity to expand on what I've started.
+Finally, there is also a direct correllation between purchasing rate spikes and distinct Amazon sale periods, like Prime Deal Days and Black Friday or Cyber Monday sales (Amazon Staff, 2024). I spent minimal time exploring this trend. This could be an opportunity to expand on what I've started.
 <p align="center">
-    <img alt="Prime Deals Day Sales-2021." width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/prime_day.png">
-    <img alt="Black Friday/Cyber Monday Sales-2021" width="45%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/black_friday_cyber_monday.png">
+    <img alt="Prime Deals Day Sales-2021." width="65%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/prime_day.png"></p>
+<p align="center">
+    <img alt="Black Friday/Cyber Monday Sales-2021" width="65%" src="https://github.com/ambermocalis/Amazon_Transactions/blob/main/images/black_friday_cyber_monday.png">
 </p>
+<p></p>
+<p></p>
+
 <p align="center">
     <em>Figure: Two charts with a Malloy tooltip showing examples of sales spikes around key sale days.</em>
 </p>
