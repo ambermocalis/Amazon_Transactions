@@ -2,71 +2,133 @@
 # Amazon Transactions Analysis 
 ## Crowdsourced U.S. Amazon purchase histories from 2018 - 2022
 
-This analysis explores purchasing behavior on Amazon, focusing on the correlation between demographics (age, income, education level) and product categories purchased. 
+This analysis explores U.S. Amazon purchasing behavior of over 5,000 survey respondents. The analysis focuses on the correlation between demographics (age, gender, race, income, education level, geographic location) and product categories and cost. Many of the analyses have Malloy 'tooltips,' so be sure to hover your curser over the visualizations for deeper insights.
 
-<mark> edit this after analysis </mark>
-The findings suggest that demographic factors significantly influence purchase decisions, with certain age groups and income levels showing preferences for specific product types. Additionally, regional variations in product choices and spending behavior were identified.
+Check out the [ReadMe file](README.md) for a Summary of Findings and references and thanks for reading!
 >>>malloy
 import 'AmazonTransactions_source.malloy'
+>>>markdown
+Here is a quick preview of the transactions table that we will be analyzing:
 >>>malloy
 run: transactions -> {
     select: *
     limit: 5
 }
+>>>markdown
+You'll see we have 'Survey ResponseID' codes that form the unique key that allows us to link our transactions table and demogrphics table together. I have also joined a FIPS code table called 'states' to allow for some heatmapping in some of our analysis. These are joined on state name.
+
+For the following analysis, I rely heavily on the 'Category,' 'Order Date,' and 'LineCost' columns to draw conclusions about the data. 'LineCost' is an extended dimension of the transactions table defined as 'Quantity' * 'Purchase Price Per Unit,' giving us the total purchase cost to the consumer/survey respondent of that particular item. 'LineCost' allows us to use the SUM() expression to find total cost of orders across a variety of metrics.
 >>>malloy
 run: demographics -> {
     select: *
     limit: 5
 }
 >>>markdown
-### Basic Analysis Questions:
-#### Question 1
-**What are the most common product categories purchased on Amazon?**
+Our demographics table provides answers to the Amazon survey questions. You can check out the 'fields.csv' file in the repository to see the specific survey questions. For this analysis, we rely primarily on age, gender, race, education level, and income range. There are plenty of other dimensions that could be analyzed as an extension of this project. Other data scientists can build on the foundational analysis below and glean deeper insights into Amazon purchasing behavior with some of the unused data dimensions.
+
+##### First, let's explore the data a little bit so we understand what we are analyzing:
 >>>malloy
-# bar_chart {size=lg, title="Transaction by Product Categories"}
 run: transactions -> {
-    group_by: Category
-    aggregate: num_rows
-    where: Category is not null
-    limit: 50
-    # tooltip
-    # bar_chart
-    nest: `Categories by Year`
+    aggregate: 
+        `Number of Respondents` is num_respondents
+        `Average Items Purchased` is round(sum(Quantity) / num_respondents)
 }
 >>>malloy
-# bar_chart {size=lg, title="Top 10 Sale Categories", subtitle="Plus Category Breakdown by Year"}
 run: transactions -> {
-    group_by: Category
-    aggregate: num_rows
+    aggregate: 
+        `First Order Date` is min(`Order Date`)
+        `Last Order Date` is max(`Order Date`)
+}
+>>>malloy
+run: transactions -> {
+    # currency
+    aggregate: 
+        `Cheapest Item` is min(`Purchase Price Per Unit`)
+        `Average Item Price` is avg(`Purchase Price Per Unit`)
+        `Most Expensive Item` is max(`Purchase Price Per Unit`)
+}
+>>>malloy
+run: transactions -> {
+    where: `Purchase Price Per Unit` = 6398.95
+    group_by: Category, Item_Description
+    aggregate: 
+        count_of_items is count(Item_Description)
+}
+>>>malloy
+run: transactions -> {
+    where: `Purchase Price Per Unit` = 0.01
+    aggregate: 
+        count_of_penny_items is count(Item_Description)
+        count_of_categories is count(Category)
+    # bar_chart
+    nest: by_category is {
+        group_by: Category
+        aggregate: count_of_items is count(Item_Description)
+        where: `Purchase Price Per Unit` = 0.01
+        limit: 50
+        # tooltip
+        nest: items is {
+            group_by: Item_Description
+            where: Title is not null
+        }
+    }
+}
+>>>malloy
+run: transactions -> hist_by_price
+>>>markdown
+These analyses verify that we have data from 5,027 respondents from January 1, 2018 to August 15, 2024. To keep our analyses consistent and to avoid having to run a lot of 'Percent of Total' analyses, I have focused on the period from 01-01-2018 to 12-31-2022.
+
+Most items cost $22 on average, but the price per unit ranged anywhere from $0.01 (mainly jewelry, books, and software provided by third-party Amazon business partners) to $6,398.95 (a desktop hard-drive enclosure with 12 slots). In fact, we have an F-distribution of product prices, where most fall between $1.50 and approximately $35. Products priced at more than $35 are outliers when it comes to Amazon product pricing.
+
+With all that in mind, let's dig into our analysis...
+
+### Basic Analysis Questions:
+#### **What are the most common product categories purchased on Amazon?**
+>>>malloy
+run: transactions -> {
+    aggregate: 
+        `Number of Product Categories` is count(Category)
+}
+>>>malloy
+# bar_chart {size=lg, title="Top 10 Categories by Sales", subtitle="Plus Category Breakdown by Year"}
+run: transactions -> {
     where: Category is not null
+    where: `Order Date`.year < @2023
+    group_by: Category
+    aggregate: items_purchased
     limit: 10
     # tooltip
     # bar_chart
     nest: `Categories by Year`
 }
 >>>markdown
-1. Answer: Interestingly enough, the top purchase category of Amazon customers are <ins>**books**</ins> at over 87,000 transactions from 2018 to 2022! Books experience over 128% higher sales than the next highest category of <ins>**pet food**</ins>. Keep in mind that this is over the entire time range captured by the survey.
+The dataset has sourced over 1,800 distinct product categories. We will split our analyses between looking at the top 5 and top 10 categories so simplify our analysis. Interestingly enough, the top purchase categories of Amazon customers are <ins>**books**</ins> at over 87,000 transactions from 2018 to 2022! Books experience over 128% higher sales than the next highest category of <ins>**pet food**</ins>. Keep in mind that this is over the entire time range captured by the survey.
 >>>malloy
 run: transactions -> {
     group_by: `ASIN/ISBN (Product Code)`, Title
     aggregate: num_rows
     order_by: num_rows desc
     limit: 10
+    where: 
+        Title !~ '%Gift%', 
+        Title !~ '%gift%',
+        Title !~ '%Reload%'
 }
 >>>markdown
-For curiosity's sake, the most purchased item by the survey respondents (that was not a gift card) was Amazon Basic AA batteries. After batteries, the Echo Dot Alexa speaker was the most purchased item.
+For curiosity's sake, the most purchased item by the survey respondents (that was not a gift card or reload balance) was Amazon Basic AA batteries. After batteries, the Echo Dot Alexa speaker was the most purchased item.
+
+Let's look at a breakdown of sales by category across years:
 >>>malloy
-# bar_chart {title="Items Sold by Year (and Category)"}
 run: transactions -> {
+    where: `Order Year` < @2023   
     group_by: `Order Year`
     aggregate: items_purchased
-    # tooltip
-    nest: `Top Categories`
     order_by: `Order Year`
-    where: `Order Year` < @2023
+    nest: `Top Categories`
+    nest: `Bar: Top Categories by Units Sold`
 }
 >>>malloy
-# bar_chart {size=lg, title="Top 5 Category Purchases by Year"}
+# bar_chart {title="Top 5 Category Purchases by Year"}
 run: transactions -> {
     group_by: `Order Year`
     aggregate: items_purchased
@@ -75,11 +137,32 @@ run: transactions -> {
     nest: `Top 5 Categories`
     order_by: `Order Year`
     where: `Order Year` < @2023}
+>>>malloy
+# bar_chart {title="Items Sold by Year (and Category)"}
+run: transactions -> {
+    where: `Order Year` < @2023   
+    group_by: `Order Year`
+    aggregate: items_purchased
+    order_by: `Order Year`
+    # tooltip
+    # bar_chart {x.independent}
+    nest: `Top Categories`
+}
+>>>malloy
+run: transactions -> {
+    where: `Order Year` < @2023   
+    group_by: `Order Year`
+    aggregate: items_purchased
+    order_by: `Order Year`
+    # bar_chart {size=spark}
+    nest: `Top Categories`
+}
 >>>markdown
-1. You can see in the above charts that <ins>**books**</ins> and <ins>**pet food**</ins> remain top purchases of Amazon customers each year, with <ins>**gift card purchases**</ins>, <ins>**shirts**</ins>, and <ins>**nutritional supplements**</ins> vying for 3rd, 4th, and 5th place for sales.
+You can see in the above charts that <ins>**books**</ins> and <ins>**pet food**</ins> remain top purchases of Amazon customers each year, with <ins>**gift card purchases**</ins>, <ins>**shirts**</ins>, and <ins>**nutritional supplements**</ins> vying for 3rd, 4th, and 5th place for sales. Other categories of note, that I suspect we'll see later in our deeper analysis into demographic purchasing correlations, are electronic accessories (cords, phone cases, etc.), clothing items (pants and shoes to go with that shirt?), medication, and grocery/food/vegetable items.
 >>>markdown
-#### Question 2
-**How do demographics (age, income, education) influence purchasing behavior?**
+#### **How do demographics (age, gender, race, income, education, geography) influence purchasing behavior?**
+
+With that, let's look at if and how purchasing trends change across demographics. We'll be looking at age, gender, race, education level, income level and geography, in that order.
 
 ##### Age Group Analysis
 >>>malloy
@@ -113,7 +196,7 @@ run: transactions -> {
     order_by: age_group, `Order Year` asc
 }
 >>>malloy
-# bar_chart.stack
+# bar_chart.stack 
 run: transactions -> {
     where: `Order Year` < @2023
     group_by: `Order Year`, demographics.age_group
@@ -133,6 +216,39 @@ run: transactions -> {
 }
 >>>markdown
 Therefore, what we see in the charts above is that 25-34 and 35-44 year age groups comprise the bulk of purchases, but when you compare the size of the age group as a percent of all age groups, we find that the 35-44 and 45-54 year age groups are making larger purchases in terms of variety of purchases across categories.
+
+I want to take a short detour and take a look at different levels of analysis on purchasing behavior by age group.
+##### **Do certain age groups spend more on particular product categories?**
+>>>malloy
+
+run: transactions -> {
+    group_by: demographics.age_group
+    where: `Order Year` < @2023
+    order_by: age_group
+    #  bar_chart {x.independent, y.independent}
+    nest: `Top 5 Spending Categories`
+}
+>>>malloy
+
+run: transactions -> {
+    group_by: demographics.age_group
+    where: `Order Year` < @2023
+    order_by: age_group
+    #  bar_chart {size=spark}
+    nest: `Top 5 Spending Categories`
+}
+>>>malloy
+# bar_chart.stackﬁ
+run: transactions -> {
+    where: Category ? 'ABIS_BOOK' | 'PET_FOOD' | 'NUTRITIONAL_SUPPLEMENT' | 'SHIRT' | 'GIFT_CARD' | 'MEDICATION' | 'COFFEE' --`Order Year` < @2023
+    group_by: demographics.age_group, Category
+    aggregate: items_purchased
+    order_by: age_group, Category
+    --#  bar_chart {x.independent, y.independent}
+    --nest: `Top 5 Categories`
+}
+>>>markdown
+Short answer-we've already seen that books, pet food, gift cards, shirts, and nutritional supplements are the top categories across all age groups. The only significant change we see is coffee and medication being added to top categories purchased by the 55-64 and 65 and over categories.
 
 To continue analyzing this data, let's look at gender, income, and education level to better understand purchase trends.
 
@@ -191,7 +307,7 @@ run: transactions -> {
 >>>markdown
 We see here from this series of graphs that purchasing trends are consistent with anecdotal consumer trends, which is that women are purchasing a greater number of items and for a higher total purchase amount-which just means that there's no difference between the cost of individual items purchased between genders (i.e. men aren't buying fewer but more expensive items, the variation of item cost is roughly the same).
 
-##### Education Level Analysis
+##### Purchasing Trends by Education Level
 >>>malloy
 run: transactions -> {
     where: demographics.education_ranked != null
@@ -205,6 +321,7 @@ run: transactions -> {
 # bar_chart {title="Items Purchased by Year and Education Level"}
 run: transactions -> {
     where: demographics.education_ranked != null
+    where: `Order Year`.year < @2023
     group_by: Education is demographics.`Q-demos-education`
     aggregate: items_purchased
     # tooltip
@@ -212,7 +329,16 @@ run: transactions -> {
     nest: `Purchases by Year`
 }
 >>>malloy
-# bar_chart {title="Items Purchases by Education Level"}
+# bar_chart {size=lg, title="Items Purchased by Education Level"}
+run: transactions -> {
+    where: `Order Year` < @2023
+    where: demographics.education_ranked != null
+    group_by: `Order Year`, Education is demographics.`Q-demos-education`
+    aggregate: items_purchased
+    order_by: `Order Year`, items_purchased desc
+}
+>>>malloy
+# bar_chart.stack 
 run: transactions -> {
     where: `Order Year` < @2023
     where: demographics.education_ranked != null
@@ -245,7 +371,7 @@ run: transactions -> {
     nest: `Purchases by Income`
 }
 >>>malloy
-# bar_chart {title="Items Purchased by Income Level"}
+# bar_chart {size=lg, title="Items Purchased by Income Level"}
 run: transactions -> {
     where: `Order Year` < @2023
     where: demographics.income_more_than != null
@@ -257,8 +383,6 @@ run: transactions -> {
 To continue with the trend above, and generously assuming some level of correllation between education level and income level, we find that the preponderance of purchases is made by those in the $100k-$150k income bracket, with the $25k to $75k income levels following closely behind. It is interesting to see that the $75k-$100k bracket lags behind the three previously mentioned brackets, following by the over $150k and the $0 - $25k brackets, respectively. 
 
 Variance in the data could be caused by the higher rates of survey respondents in the $25k-$50k and $50k-$75k brackets, with 6-7% more respondents than the $75k bracket. But this analysis leads me to believe that shopping on Amazon is predominantly utilized by the middle-class consumer. This would make sense, since the ease of shopping offer by Amazon allows for busy, dual-working families to still maintain a modicum of consumer spending without the required trip to a retail store.
-
-For interest, I've put together a scatter chart of income-education counts. It's not a great heat map, but you can see verify that there is some correllation between education level and income.
 >>>malloy
 # scatter_chart {trendline}
 run: transactions -> {
@@ -267,32 +391,58 @@ run: transactions -> {
     aggregate: `%` is num_respondents / all(num_respondents)
 }
 >>>markdown
-#### Question 3. 
-**Do certain age groups spend more on particular product categories?**
->>>malloy
 
+For interest, I've put together a scatter chart of income-education counts. It's not a great heat map, but you can see that there is some correllation between education level and income.
+
+And finally...
+
+##### Purchasing Trends by Race
+>>>malloy
 run: transactions -> {
-    group_by: demographics.age_group
-    where: `Order Year` < @2023
-    order_by: age_group
-    #  bar_chart {x.independent, y.independent}
-    nest: `Top 5 Categories`
+    group_by: demographics.race
+    aggregate: num_respondents
+    # percent
+    aggregate: percent_total is num_respondents / all(num_respondents)
 }
 >>>malloy
-# bar_chart.stack
+--# bar_chart {size=lg, title="Items Purchased by Gender"}
 run: transactions -> {
-    where: Category ? 'ABIS_BOOK' | 'PET_FOOD' | 'NUTRITIONAL_SUPPLEMENT' | 'SHIRT' | 'GIFT_CARD' | 'MEDICATION' | 'COFFEE' --`Order Year` < @2023
-    group_by: demographics.age_group, Category
-    aggregate: items_purchased
-    order_by: age_group, Category
-    --#  bar_chart {x.independent, y.independent}
-    --nest: `Top 5 Categories`
+    where: `Order Year` < @2023
+    group_by: `Order Year`
+    order_by: `Order Year` desc   
+    # bar_chart {size=sm}
+    nest: `Purchases by Race` 
 }
 >>>markdown
-Short answer-we've already seen that books, pet food, gift cards, shirts, and nutritional supplements are the top categories across all age groups. The only significant change we see is coffee and medication being added to top categories purchased by the 55-64 and 65 and over categories.
+Notice in the above analysis, if you hover over the bar chart and look at the tooltip, there is variation in the product categories across race profiles. To better visualize this, let's look at the data in a table and then in a spark graph:
+>>>malloy
+run: transactions -> {
+    where: `Order Year` < @2023
+    nest: `Purchases by Race` 
+}
+>>>malloy
+run: transactions -> {
+    where: `Order Year` < @2023
+    --group_by: `Order Year`
+    --order_by: `Order Year` desc   
+    
+    nest: `Purchases by Race` is {
+        group_by: demographics.race
+        aggregate: # percent
+            `% Purchases` is items_purchased / all(items_purchased)
+        # bar_chart {size=spark}
+        nest: `Purchases Insight` is {
+            where: Category is not null
+            group_by: Category
+            aggregate: perc_items is items_purchased / all(items_purchased)
+            limit: 5
+        }
+    }
+}
+>>>markdown
+This is fascinating. Native Hawaiian/Pacific Islander and American Indian/Native American or Alaska Native groups make up a tiny percentage of purchases on Amazon. Because their percentage is so small, it can be easy to miss the fact that they deviate quite dramatically from the categories preferred by White, Black, and Asian races. This gives us a clue as to what we may find when we analyze purchases by regions and states, so let's do that now...
 
-#### Question 5. 
-**Are there regional differences in product preferences or spending habits?**
+##### **Are there regional differences in product preferences or spending habits?**
 >>>malloy
 run: transactions -> {
     where: demographics.states.REGION_NAME != null
@@ -308,11 +458,43 @@ run: transactions -> {
 >>>markdown
 This really neat heat map breaks out purchasing behavior by region and state. Most notable is what categories are NOT being purchased in certain regions. Consumers in the Northeast are not getting electronic accessories on Amazon, instead they are purchasing food, vegetables, and grocery items. Consumers in the South are also not getting their groceries through Amazon.
 
-#### Question 4. 
-**How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
+So now let's dig into the race and income data we saw earlier and see if we see any trends there:
+>>>malloy
+run: transactions -> {
+    where: demographics.states.REGION_NAME is not null
+    group_by: demographics.states.REGION_NAME
+    --# currency
+    nest: `Race Distribution` is {
+        group_by: demographics.race
+        aggregate: num_respondents
+}
+    nest:
+        # shape_map
+        `Total Respondents by State`
+        --# bar_chart (size=sm, x.independent, y.independent)
+        --`Top Categories`
+}
+>>>malloy
+run: transactions -> {
+    where: demographics.states.REGION_NAME is not null
+    group_by: demographics.race
+    # hidden
+    aggregate: Respondents is num_respondents
+    order_by: Respondents 
+    # shape_map
+    nest:
+        `Total Respondents by State`
+        `Total Purchases by State`       
+    # shape_map
+      nest: `Item Purchases` is {
+            group_by: demographics.states.STATE
+            aggregate: items_purchased
+       } 
+}
+>>>markdown
+#### **How does the time of year influence purchasing behavior (e.g., holidays, seasonal trends)?**
 
-Now let's take a look at orders over time to see how they trend and if there are certain times of the year that are busier than others as far as overall ordering goes, or if certain category sales spike?
-
+Finally, let's take a look at orders over time to see how they trend and if there are certain times of the year that are busier than others as far as overall ordering goes, or if certain category sales spike?
 >>>malloy
 --# line_chart
 run: transactions -> {
@@ -326,10 +508,10 @@ run: transactions -> {
         order_by: `Order Month` 
         # tooltip
         nest: 
-            # line_chart {x.independent}
-            `Day of Month`
             # bar_chart {x.independent}
-            `Top 5 Categories`
+            `Day of Month`
+            --# bar_chart {x.independent}
+            --`Top 5 Categories`
     }
     order_by: `Order Year` 
 }
@@ -344,3 +526,8 @@ Here are some Amazon Prime Day dates from the last seven years:
 - 2020: Oct 13–14 *moved due to the COVID-19 pandemic
 - 2019: July 15–16
 - 2018: July 16–17
+
+#### Conclusion
+As you can see, we've just scratched the surface of potential in this dataset and still find some interesting information, especially regarding the correlation between income and purchasing as well as varying trends in the types of products customers buy based on their race. 
+
+If you have suggestions of more analysis, please feel free to comment. You can also clone this repository and make your own contributions by starting a pull request. Or download the zip file to your own terminal and create your own analysis from where I've left off. Thank you so much for reading all the way to the end!

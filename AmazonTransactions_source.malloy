@@ -35,7 +35,10 @@ source: demographics is duckdb.table("data/survey.csv") extend {
             pick 2 when `Q-demos-education` = "Bachelor's degree"
             pick 3 when `Q-demos-education` = "Graduate or professional degree (MA, MS, MBA, PhD, JD, MD, DDS, etc)"
             else null
-    
+        race is
+            pick "Two or More Races" when strpos(`Q-demos-race`, ',') != 0
+            else `Q-demos-race`
+
     join_one: states with `Q-demos-state`
 }
 
@@ -48,14 +51,39 @@ source: transactions is duckdb.table("./data/amazon-purchases.csv") extend {
         `Order Year` is `Order Date`.years
         `Order Day` is day_of_week(`Order Date`) // where day 0 = Saturday & day 6 = Friday
         
-
+    # bar_chart {size=lg, title="Histogram of Price Per Unit Distribution"}
+    view: hist_by_price is {
+    aggregate: bin_size is (max(`Purchase Price Per Unit`)-min(`Purchase Price Per Unit`)) / 2000
+    nest: data is {
+        group_by: `Purchase Price Per Unit`
+        aggregate: product_count_distinct
+        }
+    } -> {
+    group_by: `Purchase Price Per Unit` is
+        floor(data.`Purchase Price Per Unit` / bin_size) * nullif(bin_size, 0) + bin_size / 2
+    aggregate: product_count is data.product_count_distinct.sum()
+    order_by: `Purchase Price Per Unit`
+    }
     view: `Top 5 Categories` is {
         group_by: Category
         aggregate: items_purchased
         limit: 5
         where: Category is not null
     }
-    view: `Top Categories` is {
+    view: `Top 5 Spending Categories` is {
+        group_by: Category
+        # currency
+        aggregate: total_cost
+        limit: 5
+        where: Category is not null
+    }
+    # bar_chart
+    view: `Bar: Top Categories by Units Sold` is {
+        group_by: Category
+        aggregate: items_purchased
+        limit: 10
+        where: Category is not null
+    }    view: `Top Categories` is {
         group_by: Category
         aggregate: items_purchased
         limit: 10
@@ -124,6 +152,18 @@ source: transactions is duckdb.table("./data/amazon-purchases.csv") extend {
             `% of Purchase Amount` is total_cost / all(total_cost)
         order_by: `% of Purchase Amount` desc
     }
+    view: `Purchases by Race` is {
+        group_by: demographics.race
+        aggregate: # percent
+            `% Purchases` is items_purchased / all(items_purchased)
+        # tooltip
+        nest: `Purchases Insight` is {
+            where: Category is not null
+            group_by: Category
+            aggregate: items_purchased
+            limit: 5
+        }
+    }
    view: `Purchases by Income` is {
         where: demographics.income_cleaned != "Prefer not to say"
         group_by: demographics.income_cleaned
@@ -145,6 +185,10 @@ source: transactions is duckdb.table("./data/amazon-purchases.csv") extend {
         group_by: demographics.`Q-demos-education`
         # percent
         aggregate: Purchases is total_cost / all(total_cost)
+    }
+    view: `Total Respondents by State` is {
+        group_by: demographics.states.STATE
+        aggregate: `Respondents` is num_respondents
     }
     view: `Total Purchases by State` is {
         group_by: demographics.states.STATE
